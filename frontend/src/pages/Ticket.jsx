@@ -4,9 +4,11 @@ import Modal from 'react-modal'
 import { FaPlus } from 'react-icons/fa'
 import { useSelector, useDispatch } from 'react-redux'
 import { getTicket, closeTicket } from '../features/tickets/ticketSlice'
+import { getNotes, createNote } from '../features/notes/noteSlice'
 import { useParams, useNavigate } from 'react-router-dom'
 import BackButton from '../components/BackButton'
 import Spinner from '../components/Spinner'
+import NoteItem from '../components/NoteItem'
 
 const customStyles = {
 	content: {
@@ -26,31 +28,38 @@ Modal.setAppElement('#root')
 function Ticket() {
 	const [modalIsOpen, setModalIsOpen] = useState(false)
 	const [noteText, setNoteText] = useState('')
+	const { ticket } = useSelector(state => state.tickets)
 
-	const { isLoading, isSuccess, isError, message, ticket } = useSelector(
-		state => state.tickets
-	)
+	const { notes } = useSelector(state => state.notes)
 
 	const navigate = useNavigate()
 	const dispatch = useDispatch()
 	const { ticketId } = useParams()
 
 	useEffect(() => {
-		if (isError) {
-			toast.error(message)
-		}
-
-		dispatch(getTicket(ticketId))
-	}, [ticketId, isError, message])
+		dispatch(getTicket(ticketId)).unwrap().catch(toast.error)
+		dispatch(getNotes(ticketId)).unwrap().catch(toast.error)
+	}, [ticketId, dispatch])
 
 	const onTicketClose = () => {
 		dispatch(closeTicket(ticketId))
-		toast.success('Ticket Closed')
-		navigate('/tickets')
+			.unwrap()
+			.then(() => {
+				toast.success('Ticket Closed')
+				navigate('/tickets')
+			})
+			.catch(toast.error)
 	}
 
 	const onNoteSubmit = e => {
 		e.preventDefault()
+		dispatch(createNote({ noteText, ticketId }))
+			.unwrap()
+			.then(() => {
+				setNoteText('')
+				closeModal()
+			})
+			.catch(toast.error)
 	}
 
 	const openModal = () => setModalIsOpen(true)
@@ -120,6 +129,17 @@ function Ticket() {
 					</div>
 				</form>
 			</Modal>
+
+			{notes ? (
+				notes.map(note => (
+					<NoteItem
+						key={note._id}
+						note={note}
+					/>
+				))
+			) : (
+				<Spinner />
+			)}
 
 			{ticket.status !== 'closed' && (
 				<button
